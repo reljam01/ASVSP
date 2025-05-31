@@ -1,0 +1,76 @@
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    environment:
+      - CLUSTER_NAME=test
+    ports:
+      - 9870:9870   # NameNode web UI port
+      - 9000:9000   # NameNode IPC port
+    volumes:
+      - namenode-data:/hadoop/dfs/name
+    networks:
+      - hadoopnet
+
+  datanode1:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode1
+    environment:
+      - CLUSTER_NAME=test
+      - NAMENODE_URI=hdfs://namenode:9000
+    ports:
+      - 9864:9864   # DataNode 1 web UI port
+    volumes:
+      - datanode1-data:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    networks:
+      - hadoopnet
+
+  datanode2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode2
+    environment:
+      - CLUSTER_NAME=test
+      - NAMENODE_URI=hdfs://namenode:9000
+    ports:
+      - 9865:9864   # DataNode 2 web UI port
+    volumes:
+      - datanode2-data:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    networks:
+      - hadoopnet
+
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - YARN_CONF_yarn_resourcemanager_hostname=resourcemanager
+    ports:
+      - "8088:8088"  # ResourceManager web UI port
+    depends_on:
+      - namenode
+    networks:
+      - hadoopnet
+
+  nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - YARN_CONF_yarn_resourcemanager_hostname=resourcemanager
+    depends_on:
+      - resourcemanager
+    networks:
+      - hadoopnet
+
+volumes:
+  namenode-data:
+  datanode1-data:
+  datanode2-data:
+
+networks:
+  hadoopnet:
+    driver: bridge
