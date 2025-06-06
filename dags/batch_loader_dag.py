@@ -1,22 +1,36 @@
+import subprocess
 from airflow import DAG
-from airflow.operators.bash import BashOperator
-from datetime import datetime
+from airflow.operators.python import PythonOperator
+from datetime import datetime, timedelta
+
+def execute_load_script():
+    try:
+        subprocess.run(['/opt/airflow/scripts/batch_loader.sh'], check=True)
+        print(f"Batch Loader Output:\n{result.stdout}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error trying to load batch data (batch_loader.sh): {e}")
+        raise
 
 default_args = {
-    'start_date': datetime(2025, 1, 1),
-    'retries': 0,
+    'owner': 'airflow',
+    'start_date': datetime(2025,6,6),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
 }
 
 with DAG(
-    'batch_loader',
+    'run_load_script_on_airflow_start',
     default_args=default_args,
-    schedule_interval=None,
+    description='Run batch_loader.sh daily, after Airflow starts',
+    schedule_interval='@daily',
     catchup=False,
 ) as dag:
 
-    upload_csvs = BashOperator(
-        task_id='upload_csvs_to_hdfs',
-        bash_command='bash /opt/airflow/scripts/batch_loader.sh',
-        dag=dag,
-        provide_context=False,
+    # Task to run the load.sh script
+    run_load_script_task = PythonOperator(
+        task_id='run_load_script',
+        python_callable=execute_load_script,
     )
+
+    # Run the batch_loader.sh script immediately once the DAG starts
+    run_load_script_task

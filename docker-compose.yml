@@ -4,6 +4,7 @@ services:
     container_name: namenode
     environment:
       - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
     ports:
       - 9870:9870   # NameNode web UI port
       - 9000:9000   # NameNode IPC port
@@ -17,7 +18,7 @@ services:
     container_name: datanode1
     environment:
       - CLUSTER_NAME=test
-      - NAMENODE_URI=hdfs://namenode:9000
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
     ports:
       - 9864:9864   # DataNode 1 web UI port
     volumes:
@@ -32,7 +33,7 @@ services:
     container_name: datanode2
     environment:
       - CLUSTER_NAME=test
-      - NAMENODE_URI=hdfs://namenode:9000
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
     ports:
       - 9865:9864   # DataNode 2 web UI port
     volumes:
@@ -104,6 +105,7 @@ services:
   airflow-scheduler:
     image: apache/airflow:2.6.1
     container_name: airflow-scheduler
+    user: root
     secrets:
       - airflow_fernet_key
     depends_on:
@@ -116,6 +118,7 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./batch_loader.sh:/opt/airflow/scripts/batch_loader.sh
+      - ./batch:/opt/airflow/batch
       - /var/run/docker.sock:/var/run/docker.sock
     command:
       - bash
@@ -123,7 +126,9 @@ services:
       - |
         export AIRFLOW__CORE__FERNET_KEY=$(cat /run/secrets/airflow_fernet_key) && \
         airflow db init && \
-        airflow scheduler
+        airflow scheduler && \
+        sleep 30 && \
+        airflow dags trigger run_load_script_on_airflow_start
     networks:
       - hadoopnet
 
