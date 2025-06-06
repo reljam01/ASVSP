@@ -1,0 +1,11 @@
+batch/
+secrets/
+myenv/
+logs/
+*.log
+*.pyc
+*.pyo
+*.db
+*.pid
+*.swp
+.DS_Store
