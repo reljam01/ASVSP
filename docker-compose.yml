@@ -145,6 +145,47 @@ services:
     networks:
       - hadoopnet
 
+  spark-master:
+    image: bitnami/spark:latest
+    container_name: spark-master
+    user: root
+    environment:
+      - SPARK_MODE=master
+      - SPARK_SUBMIT_OPTIONS=--conf spark.hadoop.fs.defaultFS=hdfs://namenode:9000
+      - SPARK_SUBMIT_OPTIONS=--conf spark.hadoop.fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem
+      - SPARK_SUBMIT_OPTIONS=--conf spark.hadoop.fs.file.impl=org.apache.hadoop.fs.LocalFileSystem
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+    volumes:
+      - type: bind
+        source: ./spark_scripts/
+        target: /opt/spark/
+    networks:
+      - hadoopnet
+
+  spark-worker-1:
+    image: bitnami/spark:latest
+    container_name: spark-worker-1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+    networks:
+      - hadoopnet
+
+  spark-worker-2:
+    image: bitnami/spark:latest
+    container_name: spark-worker-2
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+    networks:
+      - hadoopnet
+
 volumes:
   namenode-data:
   datanode1-data:
