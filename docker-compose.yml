@@ -200,6 +200,23 @@ services:
     networks:
       - hadoopnet
 
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: mydatabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: admin
+      MB_DB_PASS: admin
+      MB_DB_HOST: postgres_curated
+    depends_on:
+      - postgres_curated
+    networks:
+      - hadoopnet
+
 volumes:
   namenode-data:
   datanode1-data:
