@@ -186,11 +186,26 @@ services:
     networks:
       - hadoopnet
 
+  postgres_curated:
+    image: postgres:15
+    container_name: postgres_curated
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5433:5432" # 5432 used for airflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - hadoopnet
+
 volumes:
   namenode-data:
   datanode1-data:
   datanode2-data:
   postgres_data:
+  pgdata:
 
 networks:
   hadoopnet:
