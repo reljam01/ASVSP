@@ -1,16 +1,20 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col
+from pyspark.sql.functions import from_json, col, year, month, dayofmonth, hour
 from pyspark.sql.types import StructType, TimestampType, FloatType, IntegerType
 
 spark = SparkSession.builder \
     .appName("KafkaParquetLoader") \
     .getOrCreate()
 
+spark.sparkContext.setLogLevel("WARN")
+
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("subscribe", "my_topic") \
+    .option("maxOffsetsPerTrigger", 100) \
     .option("startingOffsets", "latest") \
+    .option("failOnDataLoss", "false") \
     .option("groupId", "1") \
     .load()
 
@@ -30,10 +34,17 @@ parsed_df = df.selectExpr("CAST(value AS STRING) as json_string") \
     .select(from_json(col("json_string"), schema).alias("data")) \
     .select("data.TimeStamp", "data.RotorSpeed", "data.GeneratorSpeed", "data.GeneratorTemperature", "data.WindSpeed", "data.MaxWindHeute", "data.PowerOutput")
 
+parsed_df = parsed_df \
+    .withColumn("year", year("TimeStamp")) \
+    .withColumn("month", month("TimeStamp")) \
+    .withColumn("day", dayofmonth("TimeStamp")) \
+    .withColumn("hour", hour("TimeStamp"))
+
 parsed_df.writeStream \
     .format("parquet") \
     .option("path", "hdfs://namenode:9000/user/hadoop/realtime/london/") \
-    .option("checkpointLocation", "hdfs://namenode:9000/user/hadoop/realtime/checkpoints/" \
+    .option("checkpointLocation", "hdfs://namenode:9000/user/hadoop/realtime/checkpoints/") \
+    .partitionBy("year", "month", "day", "hour") \
     .outputMode("append") \
     .trigger(processingTime="30 seconds") \
     .start() \

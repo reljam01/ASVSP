@@ -1,18 +1,20 @@
-rom pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, abs, window, mean, stddev
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import from_json, col, window, lag, when, sum, expr, count, when
 from pyspark.sql.types import StructType, TimestampType, FloatType, IntegerType
 from pyspark.sql.window import Window
 
 spark = SparkSession.builder \
-    .appName("KafkaParquetLoader") \
+    .appName("OverspeedStreamer") \
     .getOrCreate()
 
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("subscribe", "my_topic") \
+    .option("maxOffsetsPerTrigger", 100) \
     .option("startingOffsets", "latest") \
-    .option("groupId", "4") \
+    .option("failOnDataLoss", "false") \
+    .option("groupId", "3") \
     .load()
 
 schema = StructType() \
@@ -29,18 +31,24 @@ schema = StructType() \
 
 parsed_df = df.selectExpr("CAST(value AS STRING) as json_string") \
     .select(from_json(col("json_string"), schema).alias("data")) \
-    .select("data.TimeStamp", "data.RotorSpeed", "data.GeneratorSpeed")
+    .select("data.TimeStamp", "data.GeneratorSpeed", "data.RotorSpeed")
 
-diff_df = parsed_df.withColumn("speedDiff", abs(col("data.RotorSpeed") - col("data.GeneratorSpeed")))
+speed_df = parsed_df.withColumn("isOverspeed", (col("GeneratorSpeed") > 10 || col("RotorSpeed") > 10).cast("int"))
 
-windowSpec = Window.orderBy("data.TimeStamp").rangeBetween(-3600, 0)
+speed_df = speed_df.withColumn("timeWindow", window("TimeStamp", "2 minutes"))
 
-time_df = diff_df.withColumn("avgDiff", mean("speedDiff").over(windowSpec)) \
-    .withColumn("devDiff", stddev("speedDiff").over(windowSpec))
+result = speed_df.groupBy("timeWindow") \
+    .agg(
+        count("*").alias("total"),
+        sum(when(col("isOverspeed") == 1, 1).otherwise(0)).alias("overspeed_duration")
+    ) \
+    .withColumn("overspeed_percent", (col("overspeed_duration") / col("total")) * 100)
 
-outlier_df = time_df.withColumn("isOutlier", (col("speedDiff") > (col("avgDiff") + 3*col("devDiff"))).cast("boolean"))
-
-outlier_df = outlier_df.filter(col("isOutlier") == True)
+# Flatten the window struct
+flattened_result = result \
+    .withColumn("window_start", col("timeWindow.start")) \
+    .withColumn("window_end", col("timeWindow.end")) \
+    .drop("timeWindow", "total")
 
 jdbc_url = "jdbc:postgresql://postgres_curated:5432/mydatabase"
 connection_properties = {
@@ -51,11 +59,12 @@ connection_properties = {
 
 def write_to_postgres(microbatch_df, epoch_id):
     microbatch_df.write \
-        .jdbc(url=jdbc_url, table="speed_outliers_rt", mode="append", properties=connection_properties)
+        .jdbc(url=jdbc_url, table="overspeed_output_rt", mode="overwrite", properties=connection_properties)
 
-result.writeStream \
+flattened_result.writeStream \
     .foreachBatch(write_to_postgres) \
     .outputMode("update") \
     .option("checkpointLocation", "/tmp/checkpoints_overspeed") \
+    .trigger(processingTime="2 minutes") \
     .start() \
     .awaitTermination()
