@@ -23,7 +23,7 @@ typedef struct data_row {
     float PitchDeg;
 } DataRow;
 
-int parse_row(char *line, DataRow *row);
+int parse_row(int id, char *line, DataRow *row);
 void send_to_kafka(rd_kafka_t *rk, const char *message);
 
 int main() {
@@ -57,6 +57,7 @@ int main() {
             return 1;
         }
 
+        int id = 0;
         char line[1024];  // Buffer for reading each line
         DataRow row = {0};  // Structure to hold data for each row
 
@@ -70,7 +71,7 @@ int main() {
         // Read each row in the file
         while (fgets(line, sizeof(line), pfile)) {
             // Parse the row into the struct
-            if (parse_row(line, &row) > 0) {
+            if (parse_row(id, line, &row) > 0) {
                 // Create a message to send
                 char message[1024];
                 snprintf(message, sizeof(message),
@@ -93,6 +94,7 @@ int main() {
                 send_to_kafka(rk, message);
                 printf("sent msg\n");
                 sleep(1);
+                id++;
             }
         }
 
@@ -104,11 +106,23 @@ int main() {
     return 0;
 }
 
-int parse_row(char *line, DataRow *row) {
+int parse_row(int id, char *line, DataRow *row) {
     int num_values = sscanf(line, "%[^,],%f,%f,%f,%f,%f,%f,%f,%f,%f,%f",row->TimeStamp,&row->RotorSpeed,&row->GeneratorSpeed,&row->GeneratorTemperature,&row->WindSpeed,&row->PowerOutput,&row->SpeiseSpannung,&row->StatusAnlage,&row->MaxWindHeute,&row->OffsetWindDirection,&row->PitchDeg);
 
     if (row->RotorSpeed <= 0.1) {
         return 0;
+    }
+
+    if (row->PowerOutput <= 0.1) {
+        row->PowerOutput += 0.1;
+    }
+
+    if ((id % 50) < 15) {
+        row->GeneratorSpeed = 20.2;
+        row->RotorSpeed = 23.45;
+        row->PowerOutput = 13.33;
+        row->GeneratorTemperature = 45 + id;
+        row->WindSpeed += id;
     }
 
     // Get the current time

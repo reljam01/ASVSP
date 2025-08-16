@@ -222,6 +222,8 @@ services:
       MB_DB_USER: admin
       MB_DB_PASS: admin
       MB_DB_HOST: postgres_curated
+      MB_ADMIN_EMAIL: "admin@example.com"
+      MB_ADMIN_PASSWORD: "admin1234"
     depends_on:
       - postgres_curated
     networks:

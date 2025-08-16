@@ -1,7 +1,8 @@
 #!/bin/bash
 
 HDFS_CONTAINER="namenode"
-BATCH_DIR="/opt/airflow/batch"
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+BATCH_DIR="$SCRIPT_DIR/batch/london"
 HDFS_BASE_DIR="/user/hadoop/raw"
 
 echo "Waiting for HDFS..."
@@ -9,6 +10,8 @@ until docker exec "$HDFS_CONTAINER" hdfs dfsadmin -report &>/dev/null; do
     sleep 2
 done
 echo "Copying batch data to HDFS"
+
+echo "BATCH DIR IS: $BATCH_DIR"
 
 find "$BATCH_DIR" -type f | while read -r filepath; do
     rel_path="${filepath#$BATCH_DIR/}"
