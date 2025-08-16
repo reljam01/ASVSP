@@ -5,7 +5,7 @@ from pyspark.sql.window import Window
 
 # Initialize Spark session
 spark = SparkSession.builder \
-    .appName("Find day by day and cumulative consumption") \
+    .appName("Find consumption on the first day of every month") \
     .config("spark.jars.packages", "org.postgresql:postgresql:42.6.0") \
     .getOrCreate()
 

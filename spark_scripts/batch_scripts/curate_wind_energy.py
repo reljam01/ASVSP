@@ -34,7 +34,9 @@ df_grouped = df_temp \
 windowSpec = Window.partitionBy("wind_category").orderBy(col("day").desc())
 df_rownum = df_grouped.withColumn("rownum", row_number().over(windowSpec))
 
-df_last_day = df_rownum.filter(col("rownum") == 1)
+df_last_day = df_rownum.filter(col("rownum") <= 3)
+
+df_last_day = df_last_day.select("day","wind_category","total_daily")
 
 jdbc_url = "jdbc:postgresql://postgres_curated:5432/mydatabase"
 connection_properties = {
