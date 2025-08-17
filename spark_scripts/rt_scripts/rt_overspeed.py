@@ -1,11 +1,13 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, window, lag, when, sum, expr, count, when
+from pyspark.sql.functions import from_json, col, window, lag, when, sum, expr, count
 from pyspark.sql.types import StructType, TimestampType, FloatType, IntegerType
 from pyspark.sql.window import Window
 
 spark = SparkSession.builder \
     .appName("OverspeedStreamer") \
     .getOrCreate()
+
+spark.sparkContext.setLogLevel("WARN")
 
 df = spark.readStream \
     .format("kafka") \
@@ -33,7 +35,7 @@ parsed_df = df.selectExpr("CAST(value AS STRING) as json_string") \
     .select(from_json(col("json_string"), schema).alias("data")) \
     .select("data.TimeStamp", "data.GeneratorSpeed", "data.RotorSpeed")
 
-speed_df = parsed_df.withColumn("isOverspeed", (col("GeneratorSpeed") > 10 || col("RotorSpeed") > 10).cast("int"))
+speed_df = parsed_df.withWatermark("TimeStamp", "4 minutes").withColumn("isOverspeed", ((col("GeneratorSpeed") > 10) | (col("RotorSpeed") > 10)))
 
 speed_df = speed_df.withColumn("timeWindow", window("TimeStamp", "2 minutes"))
 
@@ -59,7 +61,7 @@ connection_properties = {
 
 def write_to_postgres(microbatch_df, epoch_id):
     microbatch_df.write \
-        .jdbc(url=jdbc_url, table="overspeed_output_rt", mode="overwrite", properties=connection_properties)
+        .jdbc(url=jdbc_url, table="overspeed_output_rt", mode="append", properties=connection_properties)
 
 flattened_result.writeStream \
     .foreachBatch(write_to_postgres) \

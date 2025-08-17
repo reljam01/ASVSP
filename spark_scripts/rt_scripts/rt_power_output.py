@@ -63,7 +63,7 @@ def write_latest_to_postgres(batch_df, epoch_id):
     # Write to PostgreSQL with truncate + overwrite
     latest_df.write \
         .option("truncate", "true") \
-        .jdbc(url=jdbc_url, table="power_output_rt", mode="overwrite", properties=connection_properties)
+        .jdbc(url=jdbc_url, table="power_output_rt", mode="append", properties=connection_properties)
 
 agg_df.writeStream \
     .foreachBatch(write_latest_to_postgres) \

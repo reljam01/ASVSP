@@ -121,8 +121,8 @@ int parse_row(int id, char *line, DataRow *row) {
         row->GeneratorSpeed = 20.2;
         row->RotorSpeed = 23.45;
         row->PowerOutput = 13.33;
-        row->GeneratorTemperature = 45 + id;
-        row->WindSpeed += id;
+        row->GeneratorTemperature = 45 + id % 15;
+        row->WindSpeed += id % 15;
     }
 
     // Get the current time

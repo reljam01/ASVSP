@@ -1,11 +1,15 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import desc, first, max, lit
+from pyspark.sql.functions import col, avg, max as spark_max, min as spark_min, expr
 from pyspark.sql.window import Window
+from pyspark.sql import Row
 from pyspark.sql.types import StructType, TimestampType, FloatType, IntegerType, DoubleType
+from datetime import timedelta
 spark = SparkSession.builder \
     .appName("WindPercentileCalculator") \
     .config("spark.jars.packages", "org.postgresql:postgresql:42.6.0") \
     .getOrCreate()
+
+spark.sparkContext.setLogLevel("WARN")
 
 schema = StructType() \
     .add("TimeStamp",TimestampType
@@ -31,20 +35,33 @@ rt_df = spark.read.schema(schema).parquet(rt_path)
 his_sel = his_df.select("day", "windSpeed")
 rt_sel = rt_df.select("TimeStamp", "WindSpeed")
 
-maxTs = rt_sel.select(max("TimeStamp")).collect()[0][0]
+latest_ts = rt_sel.selectExpr("max(TimeStamp)").collect()[0][0]
 
-rt_newest = rt_sel.filter(rt_sel["TimeStamp"] == maxTs)
+start_ts_expr = expr(f"timestamp('{latest_ts}') - interval 30 seconds")
+
+rt_recent = rt_sel.filter(col("TimeStamp") >= start_ts_expr)
+
+avg_ws = rt_recent.select(avg("WindSpeed").alias("avgWindSpeed")).collect()[0][0]
 
 percentiles = [0.0, 0.25, 0.5, 0.75, 1.0]
 quantiles = his_sel.approxQuantile("windSpeed", percentiles, 0.05)
 
-rt_percentile = -1.0
+rt_percentile = percentiles[0]
 for i in range(len(quantiles) - 1):
-    if quantiles[i] <= rt_newest.select("WindSpeed").first()[0]:
-        rt_percentile = percentiles[i+1]
+    if quantiles[i] <= avg_ws < quantiles[i + 1]:
+        rt_percentile = percentiles[i + 1]
         break
+if avg_ws >= quantiles[-1]:
+    rt_percentile = percentiles[-1]
 
-rt_newest_perc = rt_newest.withColumn("percentile", lit(rt_percentile).cast(DoubleType()))
+result = spark.createDataFrame([
+    Row(
+        startTimestamp=str(latest_ts - timedelta(seconds=30)),
+        endTimestamp=str(latest_ts),
+        avgWindSpeed=round(avg_ws, 2),
+        percentile=rt_percentile
+    )
+])
 
 jdbc_url = "jdbc:postgresql://postgres_curated:5432/mydatabase"
 connection_properties = {
@@ -53,4 +70,4 @@ connection_properties = {
     "driver": "org.postgresql.Driver"
 }
 
-rt_newest_perc.write.jdbc(url=jdbc_url, table="wind_percentiles", mode="append", properties=connection_properties)
+result.write.jdbc(url=jdbc_url, table="wind_percentiles", mode="append", properties=connection_properties)

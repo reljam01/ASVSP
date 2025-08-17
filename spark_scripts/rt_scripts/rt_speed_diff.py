@@ -7,6 +7,8 @@ spark = SparkSession.builder \
     .appName("SpeedDifferenceStreamer") \
     .getOrCreate()
 
+spark.sparkContext.setLogLevel("WARN")
+
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
