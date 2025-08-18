@@ -65,7 +65,7 @@ def write_to_postgres(microbatch_df, epoch_id):
 
 flattened_result.writeStream \
     .foreachBatch(write_to_postgres) \
-    .outputMode("update") \
+    .outputMode("complete") \
     .option("checkpointLocation", "/tmp/checkpoints_overspeed") \
     .trigger(processingTime="2 minutes") \
     .start() \

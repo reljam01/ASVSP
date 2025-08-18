@@ -37,9 +37,9 @@ parsed_df = df.selectExpr("CAST(value AS STRING) as json_string") \
 
 diff_df = parsed_df.withColumn("speedDiff", abs(col("RotorSpeed") - col("GeneratorSpeed")))
 
-diff_df = diff_df.withWatermark("TimeStamp", "15 minutes")
+diff_df = diff_df.withWatermark("TimeStamp", "2 minutes")
 
-stats_df = diff_df.groupBy(window("TimeStamp", "3 minutes").alias("timeWindow")) \
+stats_df = diff_df.groupBy(window("TimeStamp", "2 minutes").alias("timeWindow")) \
     .agg(mean("speedDiff").alias("avgDiff"), stddev("speedDiff").alias("devDiff")) \
     .withColumn("window_start", col("timeWindow.start")) \
     .withColumn("window_end", col("timeWindow.end")) \
@@ -54,11 +54,12 @@ connection_properties = {
 
 def write_to_postgres(microbatch_df, epoch_id):
     microbatch_df.write \
-        .jdbc(url=jdbc_url, table="speed_outliers_rt", mode="overwrite", properties=connection_properties)
+        .jdbc(url=jdbc_url, table="speed_outliers_rt", mode="append", properties=connection_properties)
 
 stats_df.writeStream \
     .foreachBatch(write_to_postgres) \
-    .outputMode("append") \
+    .outputMode("complete") \
     .option("checkpointLocation", "/tmp/checkpoints_speed") \
+    .trigger(processingTime="2 minutes") \
     .start() \
     .awaitTermination()

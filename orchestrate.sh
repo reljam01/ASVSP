@@ -42,7 +42,7 @@ for script in "$MY_DIR"/spark_scripts/rt_scripts/*.py; do
         script_name=$(basename "$script")
         echo "Running script: $script_name"
         docker exec -d "$CONTAINER_NAME" /bin/bash -c "spark-submit --packages org.postgresql:postgresql:42.6.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1 --executor-memory 2G --executor-cores 2 --num-executors 2 --driver-memory 2G /opt/spark/spark_scripts/rt_scripts/$script_name > /tmp/$script_name.log 2>&1"
-        sleep 30
+        sleep 60
     fi
 done
 
