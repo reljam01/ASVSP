@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 
-from pyspark.sql.functions import when, col, ntile
+from pyspark.sql.functions import when, col, percentile_approx
 from pyspark.sql.window import Window
 
 # Initialize Spark session
@@ -31,8 +31,11 @@ df_temp = df_selected.withColumn(
     .when(col("temperatureMax") >= 23, "Hot")
     .otherwise("Unknown"))
 
-windowSpec = Window.partitionBy("temp_category").orderBy("energy_sum")
-df_quartiles = df_temp.withColumn("quartile", ntile(4).over(windowSpec))
+df_quartiles = df_temp.groupBy("temp_category").agg(
+    percentile_approx("energy_sum", 0.25).alias("Q1"),
+    percentile_approx("energy_sum", 0.5).alias("Q2"),
+    percentile_approx("energy_sum", 0.75).alias("Q3")
+)
 
 jdbc_url = "jdbc:postgresql://postgres_curated:5432/mydatabase"
 connection_properties = {

@@ -18,11 +18,11 @@ df = spark.read.parquet(hdfs_path)
 # Calculate total energy spent per household
 df_selected = df.select("LCLid","energy_sum")
 df_summed = df_selected.groupBy("LCLid").agg(sum("energy_sum").alias("total_energy"))
-windowSpec = Window.orderBy(col("rank") <= 10)
+windowSpec = Window.orderBy(col("total_energy").desc())
 
 # Rank and find top 10 households
 df_ranked = df_summed.withColumn("rank", row_number().over(windowSpec))
-top_10_households = df_ranked.filer(col("rank") <= 10)
+top_10_households = df_ranked.filter(col("rank") <= 10)
 
 jdbc_url = "jdbc:postgresql://postgres_curated:5432/mydatabase"
 connection_properties = {
@@ -31,5 +31,5 @@ connection_properties = {
     "driver": "org.postgresql.Driver"
 }
 
-top_10_households.write.jdbc(url=jdbc_url, table="top10_households", mode="overwrite", properties=connection_properties)
+top_10_households.write.jdbc(url=jdbc_url, table="top_ten_households", mode="overwrite", properties=connection_properties)
 

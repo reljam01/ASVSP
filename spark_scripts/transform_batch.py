@@ -10,6 +10,8 @@ spark = SparkSession.builder \
     .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
     .getOrCreate()
 
+spark.sparkContext.setLogLevel("WARN")
+
 # Define schemas of electrical consumption data
 electrical_schema = StructType([
     StructField("LCLid", StringType(), True),
@@ -27,7 +29,11 @@ electrical_schema = StructType([
 weather_schema = StructType([
     StructField("temperatureMax", FloatType(), True),
     StructField("temperatureMaxTime", TimestampType(), True),
+    StructField("windBearing", IntegerType(), True),
     StructField("icon", StringType(), True),
+    StructField("dewPoint", FloatType(), True),
+    StructField("temperatureMinTime", TimestampType(), True),
+    StructField("cloudCover", FloatType(), True),
     StructField("windSpeed", FloatType(), True),
 ])
 
@@ -47,12 +53,13 @@ holidays_schema = StructType([
 ])
 
 # Read data about electrical consumption from csv-s
-df_electrical = spark.read.schema(electrical_schema).csv("hdfs://namenode:9000/user/hadoop/raw/london/daily_dataset.csv")
-df_weather = spark.read.schema(weather_schema).csv("hdfs://namenode:9000/user/hadoop/raw/london/weather_daily_darksky.csv")
-df_household = spark.read.schema(household_schema).csv("hdfs://namenode:9000/user/hadoop/raw/london/informations_households.csv")
-df_holidays = spark.read.schema(holidays_schema).csv("hdfs://namenode:9000/user/hadoop/raw/london/uk_bank_holidays.csv")
+df_electrical = spark.read.schema(electrical_schema).csv("hdfs://namenode:9000/user/hadoop/raw/daily_dataset.csv")
+df_weather = spark.read.schema(weather_schema).csv("hdfs://namenode:9000/user/hadoop/raw/weather_daily_darksky.csv")
+df_household = spark.read.schema(household_schema).csv("hdfs://namenode:9000/user/hadoop/raw/informations_households.csv")
+df_holidays = spark.read.schema(holidays_schema).csv("hdfs://namenode:9000/user/hadoop/raw/uk_bank_holidays.csv")
 
 # One max temperature per day, so we can just use the date
+df_weather = df_weather.select("temperatureMax", "temperatureMaxTime", "icon", "windSpeed")
 df_weather_date = df_weather.withColumn("day", to_date(df_weather["temperatureMaxTime"]))
 
 df_el_w = df_electrical.join(df_weather_date, on="day", how="inner")
