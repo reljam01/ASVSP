@@ -50,7 +50,7 @@ result = speed_df.groupBy("timeWindow") \
 flattened_result = result \
     .withColumn("window_start", col("timeWindow.start")) \
     .withColumn("window_end", col("timeWindow.end")) \
-    .drop("timeWindow", "total")
+    .drop("timeWindow", "total", "overspeed_duration")
 
 jdbc_url = "jdbc:postgresql://postgres_curated:5432/mydatabase"
 connection_properties = {
@@ -61,7 +61,7 @@ connection_properties = {
 
 def write_to_postgres(microbatch_df, epoch_id):
     microbatch_df.write \
-        .jdbc(url=jdbc_url, table="overspeed_output_rt", mode="append", properties=connection_properties)
+        .jdbc(url=jdbc_url, table="overspeed_output_rt", mode="overwrite", properties=connection_properties)
 
 flattened_result.writeStream \
     .foreachBatch(write_to_postgres) \

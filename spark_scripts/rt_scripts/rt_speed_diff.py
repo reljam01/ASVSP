@@ -54,7 +54,7 @@ connection_properties = {
 
 def write_to_postgres(microbatch_df, epoch_id):
     microbatch_df.write \
-        .jdbc(url=jdbc_url, table="speed_outliers_rt", mode="append", properties=connection_properties)
+        .jdbc(url=jdbc_url, table="speed_outliers_rt", mode="overwrite", properties=connection_properties)
 
 stats_df.writeStream \
     .foreachBatch(write_to_postgres) \
